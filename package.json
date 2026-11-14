@@ -1,0 +1,19 @@
+{
+  "name": "proyecto-minka",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "apps/api",
+    "packages/contracts"
+  ],
+  "scripts": {
+    "start:web": "npm --workspace apps/web start",
+    "start:api": "npm --workspace apps/api run start:dev",
+    "build:web": "npm --workspace apps/web run build",
+    "build:api": "npm --workspace apps/api run build",
+    "test:web": "npm --workspace apps/web test -- --watch=false",
+    "test:api": "npm --workspace apps/api run test",
+    "docker:up": "docker compose up -d postgres",
+    "docker:down": "docker compose down"
+  }
+}

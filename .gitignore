@@ -1,0 +1,33 @@
+# Dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+.angular/
+.nx/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Logs and local tooling
+*.log
+.DS_Store
+.vscode/
+.idea/
+
+# Private coordination documents
+# These files may contain the internal work distribution.
+docs/PLAN_TRABAJO_PARALELO.md
+docs/DECISIONES.md
+docs/PROGRESS.md
+
+# Local database volumes
+postgres-data/
+
+# Generated test artifacts
+test-results/
+playwright-report/
+
+TAREAS_TECNICAS_A_B.md
