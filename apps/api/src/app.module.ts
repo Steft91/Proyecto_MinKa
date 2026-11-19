@@ -7,9 +7,17 @@ import { AccessControlModule } from './modules/access-control/access-control.mod
 import { CatalogModule } from './modules/catalog/catalog.module.js';
 import { ProposalsModule } from './modules/proposals/proposals.module.js';
 import { AdminReviewModule } from './modules/admin-review/admin-review.module.js';
+import { EvaluationResultsModule } from './modules/evaluation-results/evaluation-results.module.js';
 
 @Module({
-  imports: [PrismaModule, AccessControlModule, CatalogModule, ProposalsModule, AdminReviewModule],
+  imports: [
+    PrismaModule,
+    AccessControlModule,
+    CatalogModule,
+    ProposalsModule,
+    AdminReviewModule,
+    EvaluationResultsModule,
+  ],
   controllers: [AppController, HealthController],
   providers: [AppService],
 })
