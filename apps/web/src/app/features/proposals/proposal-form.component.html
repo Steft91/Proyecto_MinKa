@@ -1,0 +1,188 @@
+<section class="proposal-page">
+  <a class="back-link" routerLink="/actividades">← Volver al catálogo</a>
+  @if (created(); as proposal) {
+    <div class="state-panel" role="status">
+      <h1>Propuesta registrada</h1>
+      <p>{{ proposal.titulo }}</p>
+      <p>Quedó pendiente de evaluación. Podrás consultar su estado en “Mis propuestas”.</p>
+      <a
+        class="button-primary button-link"
+        [routerLink]="['/mis-propuestas', proposal.id_propuesta]"
+        >Ver mi propuesta</a
+      >
+    </div>
+  } @else {
+    <header class="proposal-heading">
+      <p class="eyebrow">Una iniciativa para La Mena 2</p>
+      <h1>Proponer una actividad</h1>
+      <p>Completa todos los campos. La propuesta se evaluará antes de publicarse.</p>
+    </header>
+    @if (loading()) {
+      <p role="status">Comprobando requisitos…</p>
+    }
+    @if (eligibilityMessage()) {
+      <div class="notice" role="status">{{ eligibilityMessage() }}</div>
+    }
+    <form class="proposal-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <fieldset>
+        <legend>Información de la actividad</legend>
+        <div class="form-field">
+          <label for="titulo">Título</label
+          ><input
+            id="titulo"
+            formControlName="titulo"
+            maxlength="180"
+            [attr.aria-invalid]="fieldError('titulo')"
+          />
+          @if (fieldError('titulo')) {
+            <p class="field-error">Escribe un título de hasta 180 caracteres.</p>
+          }
+        </div>
+        <div class="form-field">
+          <label for="categoria_codigo">Categoría</label
+          ><select
+            id="categoria_codigo"
+            formControlName="categoria_codigo"
+            [attr.aria-invalid]="fieldError('categoria_codigo')"
+          >
+            <option value="">Selecciona una categoría</option>
+            @for (category of categories(); track category.codigo) {
+              <option [value]="category.codigo">{{ category.nombre }}</option>
+            }
+          </select>
+          @if (fieldError('categoria_codigo')) {
+            <p class="field-error">Selecciona una categoría.</p>
+          }
+        </div>
+        <div class="form-field">
+          <label for="descripcion">Descripción</label
+          ><textarea
+            id="descripcion"
+            formControlName="descripcion"
+            rows="4"
+            [attr.aria-invalid]="fieldError('descripcion')"
+          ></textarea>
+          @if (fieldError('descripcion')) {
+            <p class="field-error">Describe qué harán los participantes.</p>
+          }
+        </div>
+        <div class="form-field">
+          <label for="finalidad_comunitaria">Finalidad comunitaria</label
+          ><textarea
+            id="finalidad_comunitaria"
+            formControlName="finalidad_comunitaria"
+            rows="3"
+            [attr.aria-invalid]="fieldError('finalidad_comunitaria')"
+          ></textarea>
+          @if (fieldError('finalidad_comunitaria')) {
+            <p class="field-error">Explica cómo beneficiará al barrio.</p>
+          }
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Lugar y horario</legend>
+        <div class="form-field">
+          <label for="direccion_lugar">Dirección del encuentro</label
+          ><input
+            id="direccion_lugar"
+            formControlName="direccion_lugar"
+            maxlength="255"
+            [attr.aria-invalid]="fieldError('direccion_lugar')"
+          />
+          @if (fieldError('direccion_lugar')) {
+            <p class="field-error">Escribe la dirección del encuentro.</p>
+          }
+        </div>
+        <p class="form-help">
+          Indica las coordenadas del lugar donde se realizará la actividad. Se comprobará que esté
+          dentro de La Mena 2. Utiliza hasta siete decimales.
+        </p>
+        <div class="form-columns">
+          <div class="form-field">
+            <label for="latitud_lugar">Latitud</label
+            ><input
+              id="latitud_lugar"
+              type="number"
+              step="any"
+              formControlName="latitud_lugar"
+              [attr.aria-invalid]="fieldError('latitud_lugar')"
+            />
+            @if (fieldError('latitud_lugar')) {
+              <p class="field-error">Ingresa una latitud válida, entre −90 y 90.</p>
+            }
+          </div>
+          <div class="form-field">
+            <label for="longitud_lugar">Longitud</label
+            ><input
+              id="longitud_lugar"
+              type="number"
+              step="any"
+              formControlName="longitud_lugar"
+              [attr.aria-invalid]="fieldError('longitud_lugar')"
+            />
+            @if (fieldError('longitud_lugar')) {
+              <p class="field-error">Ingresa una longitud válida, entre −180 y 180.</p>
+            }
+          </div>
+        </div>
+        <div class="form-columns">
+          <div class="form-field">
+            <label for="inicio_previsto">Inicio</label
+            ><input
+              id="inicio_previsto"
+              type="datetime-local"
+              formControlName="inicio_previsto"
+              [attr.aria-invalid]="fieldError('inicio_previsto')"
+            />
+            @if (fieldError('inicio_previsto')) {
+              <p class="field-error">Indica fecha y hora de inicio.</p>
+            }
+          </div>
+          <div class="form-field">
+            <label for="fin_previsto">Finalización</label
+            ><input
+              id="fin_previsto"
+              type="datetime-local"
+              formControlName="fin_previsto"
+              [attr.aria-invalid]="fieldError('fin_previsto')"
+            />
+            @if (fieldError('fin_previsto')) {
+              <p class="field-error">Indica fecha y hora de finalización.</p>
+            }
+          </div>
+        </div>
+        <p class="form-help">Horarios de Ecuador continental (UTC−5).</p>
+        @if (dateError()) {
+          <p class="field-error" role="alert">{{ dateError() }}</p>
+        }
+        <div class="form-field">
+          <label for="cupo_maximo">Cupo máximo</label
+          ><input
+            id="cupo_maximo"
+            type="number"
+            min="1"
+            step="1"
+            formControlName="cupo_maximo"
+            [attr.aria-invalid]="fieldError('cupo_maximo')"
+          />
+          @if (fieldError('cupo_maximo')) {
+            <p class="field-error">Ingresa una cantidad entera mayor que cero.</p>
+          }
+        </div>
+      </fieldset>
+      @if (error()) {
+        <div class="notice notice-error" role="alert">{{ error() }}</div>
+      }
+      <div class="form-actions">
+        <a routerLink="/mis-propuestas">Mis propuestas</a
+        ><button
+          class="button-primary"
+          type="submit"
+          [disabled]="loading() || !allowed() || saving()"
+        >
+          {{ saving() ? 'Guardando…' : 'Enviar propuesta' }}
+        </button>
+      </div>
+    </form>
+  }
+</section>
