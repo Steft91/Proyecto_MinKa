@@ -1,0 +1,50 @@
+<section class="proposal-page">
+  <header class="my-proposals-heading">
+    <div>
+      <p class="eyebrow">Tu participación en el barrio</p>
+      <h1>Mis propuestas</h1>
+    </div>
+    <a class="button-primary button-link" routerLink="/propuestas/nueva">Nueva propuesta</a>
+  </header>
+  @if (state(); as result) {
+    @if (result.loading) {
+      <div class="state-panel" role="status">Cargando tus propuestas…</div>
+    } @else if (result.error) {
+      <div class="state-panel" role="alert">
+        <p>{{ result.error }}</p>
+        <button class="button-primary" type="button" (click)="retry()">Reintentar</button>
+      </div>
+    } @else if (!result.proposals.length) {
+      <div class="state-panel">
+        <h2>Aún no has enviado propuestas</h2>
+        <p>Puedes proponer una actividad comunitaria y consultar aquí su estado.</p>
+        <a routerLink="/propuestas/nueva">Preparar una propuesta</a>
+      </div>
+    } @else {
+      <div class="proposal-list">
+        @for (proposal of result.proposals; track proposal.id_propuesta) {
+          <article class="proposal-list-item">
+            <div>
+              <span class="category-tag">{{ labels[proposal.estado] }}</span>
+              <h2>
+                <a [routerLink]="['/mis-propuestas', proposal.id_propuesta]">{{
+                  proposal.titulo
+                }}</a>
+              </h2>
+              <p>
+                Enviada el {{ proposal.creada_en | date: 'd MMM y, HH:mm' : '-0500' }} · Versión
+                {{ proposal.version_actual }}
+              </p>
+            </div>
+            <a
+              [routerLink]="['/mis-propuestas', proposal.id_propuesta]"
+              [attr.aria-label]="'Consultar propuesta ' + proposal.titulo"
+              >Consultar →</a
+            >
+          </article>
+        }
+      </div>
+      <button class="button-text" type="button" (click)="retry()">Actualizar estados</button>
+    }
+  }
+</section>

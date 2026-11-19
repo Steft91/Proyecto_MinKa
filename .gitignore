@@ -5,6 +5,8 @@ build/
 coverage/
 .angular/
 .nx/
+*.tsbuildinfo
+apps/api/src/generated/
 
 # Local environment and secrets
 .env
