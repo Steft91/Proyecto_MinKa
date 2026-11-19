@@ -1,0 +1,107 @@
+<section class="page-intro">
+  <p class="eyebrow">La Mena 2 · Quito</p>
+  <h1>Actividades comunitarias</h1>
+</section>
+
+<section class="catalog-content" aria-label="Catálogo de actividades">
+  <form
+    class="filter-panel"
+    (ngSubmit)="search()"
+    [formGroup]="form"
+    aria-label="Filtrar actividades"
+  >
+    <app-category-filter
+      [control]="form.controls.category"
+      [categories]="state()?.categories ?? []"
+    />
+    <div>
+      <label for="dateFrom">Desde</label
+      ><input id="dateFrom" type="date" formControlName="dateFrom" />
+    </div>
+    <div>
+      <label for="dateTo">Hasta</label
+      ><input
+        id="dateTo"
+        type="date"
+        formControlName="dateTo"
+        [min]="form.controls.dateFrom.value"
+      />
+    </div>
+    <div>
+      <label for="location">Lugar</label
+      ><input
+        id="location"
+        type="search"
+        formControlName="location"
+        maxlength="120"
+        placeholder="Parque, cancha, dirección…"
+      />
+    </div>
+    <button type="submit" class="button-primary" [disabled]="invalidRange()">Buscar</button>
+    @if (invalidRange()) {
+      <p class="filter-error" role="alert">
+        La fecha final debe ser igual o posterior a la inicial.
+      </p>
+    }
+  </form>
+
+  @if (state(); as result) {
+    <div class="results-heading">
+      <p aria-live="polite">
+        @if (!result.loading && !result.error) {
+          {{ result.activities.length }}
+          {{ result.activities.length === 1 ? 'actividad disponible' : 'actividades disponibles' }}
+        }
+      </p>
+      @if (
+        result.filters.category ||
+        result.filters.dateFrom ||
+        result.filters.dateTo ||
+        result.filters.location
+      ) {
+        <button type="button" class="button-text" (click)="clear()">Limpiar filtros</button>
+      }
+    </div>
+    @if (result.loading) {
+      <div class="state-panel" role="status">
+        <span class="loading-dot" aria-hidden="true"></span>
+        <p>Cargando actividades…</p>
+      </div>
+    } @else if (result.error) {
+      <div class="state-panel" role="alert">
+        <h3>No se pudo cargar el catálogo</h3>
+        <p>{{ result.error }}</p>
+        <button type="button" class="button-primary" (click)="retry()">Reintentar</button>
+      </div>
+    } @else if (!result.activities.length) {
+      <div class="state-panel empty-state">
+        <span class="empty-mark" aria-hidden="true">m</span>
+        @if (
+          result.filters.category ||
+          result.filters.dateFrom ||
+          result.filters.dateTo ||
+          result.filters.location
+        ) {
+          <h3>No encontramos actividades con esos filtros</h3>
+          <p>Prueba otra categoría, fecha o lugar.</p>
+          <button type="button" class="button-text" (click)="clear()">
+            Ver todas las actividades
+          </button>
+        } @else {
+          <h3>Aún no hay actividades publicadas</h3>
+          <p>Cuando se publique una actividad, podrás consultar aquí sus detalles y cupos.</p>
+        }
+      </div>
+    } @else {
+      <div class="activity-grid">
+        @for (activity of result.activities; track activity.id_actividad) {
+          <app-activity-card
+            [activity]="activity"
+            [categoryName]="categoryName(activity.categoria_codigo)"
+            [filters]="result.filters"
+          />
+        }
+      </div>
+    }
+  }
+</section>
