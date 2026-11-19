@@ -5,11 +5,10 @@ import { HealthController } from './health.controller.js';
 import { PrismaModule } from './database/prisma.module.js';
 import { AccessControlModule } from './modules/access-control/access-control.module.js';
 import { CatalogModule } from './modules/catalog/catalog.module.js';
-import { AuditModule } from './modules/audit/audit.module.js';
-import { NotificationEventsModule } from './modules/notification-events/notification-events.module.js';
+import { ProposalsModule } from './modules/proposals/proposals.module.js';
 
 @Module({
-  imports: [PrismaModule, AccessControlModule, CatalogModule, AuditModule, NotificationEventsModule],
+  imports: [PrismaModule, AccessControlModule, CatalogModule, ProposalsModule],
   controllers: [AppController, HealthController],
   providers: [AppService],
 })
