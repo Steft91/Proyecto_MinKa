@@ -34,6 +34,22 @@ de convertirlo en la base oficial de Sprint 3.
 Todo cambio que afecte API, DTO, migraciones, eventos o contratos se registra aquí con
 fecha, motivo, impacto y pruebas requeridas antes de integrar.
 
+## 2026-11-21 — Fuentes del frontend sin dependencia de red
+
+### Decisión
+
+El build no descargará fuentes desde Google Fonts. Se usará una pila local del sistema.
+
+### Motivo
+
+El empaquetado debe ser reproducible aunque el entorno no tenga acceso a internet.
+
+### Impacto
+
+- Se eliminó la importación remota de `src/styles.scss`.
+- No cambia el contrato ni la lógica de negocio.
+- Si se desea una fuente propia, deberá incorporarse como asset versionado.
+
 ## 2026-11-21 — Perfil OAuth inicialmente incompleto
 
 ### Decisión
