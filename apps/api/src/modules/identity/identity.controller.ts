@@ -15,4 +15,5 @@ export class IdentityController {
     const claims = await this.verifier.verify(body.idToken);
     return this.identity.loginWithGoogle(claims);
   }
+
 }
