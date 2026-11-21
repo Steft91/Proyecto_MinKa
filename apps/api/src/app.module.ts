@@ -8,6 +8,7 @@ import { CatalogModule } from './modules/catalog/catalog.module.js';
 import { ProposalsModule } from './modules/proposals/proposals.module.js';
 import { AdminReviewModule } from './modules/admin-review/admin-review.module.js';
 import { EvaluationResultsModule } from './modules/evaluation-results/evaluation-results.module.js';
+import { IdentityModule } from './modules/identity/identity.module.js';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { EvaluationResultsModule } from './modules/evaluation-results/evaluation
     ProposalsModule,
     AdminReviewModule,
     EvaluationResultsModule,
+    IdentityModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

@@ -33,3 +33,22 @@ de convertirlo en la base oficial de Sprint 3.
 
 Todo cambio que afecte API, DTO, migraciones, eventos o contratos se registra aquí con
 fecha, motivo, impacto y pruebas requeridas antes de integrar.
+
+## 2026-11-21 — Perfil OAuth inicialmente incompleto
+
+### Decisión
+
+El login de Google puede crear una cuenta con perfil incompleto. Los datos de perfil
+obligatorios, incluida la fecha de nacimiento, se completan después mediante HU01.
+
+### Motivo
+
+Google autentica la identidad, pero no proporciona todos los datos funcionales que Minka
+necesita para validar mayoría de edad y habilitar propuestas.
+
+### Impacto
+
+- Los campos de perfil pendientes son anulables en `persona`.
+- Una sesión con perfil incompleto no puede proponer.
+- Los servicios que calculan mayoría de edad deben tratar una fecha nula como `false`.
+- La migración `20261121120000_perfil_pendiente` acompaña el cambio.
