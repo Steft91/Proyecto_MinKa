@@ -1,0 +1,343 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum EstadoUsuario {
+  activo
+  suspendido
+
+  @@map("estado_usuario")
+}
+
+enum EstadoPropuesta {
+  pendiente_evaluacion
+  en_revision
+  aprobada
+  rechazada
+  retirada
+
+  @@map("estado_propuesta")
+}
+
+enum EstadoActividad {
+  publicada
+  finalizada
+  cancelada
+
+  @@map("estado_actividad")
+}
+
+enum EstadoInscripcion {
+  activa
+  pendiente_suspension
+  cancelada_ciudadano
+  cancelada_suspension
+  cancelada_actividad
+
+  @@map("estado_inscripcion")
+}
+
+model Persona {
+  id_persona        String   @id @default(uuid()) @db.Uuid
+  nombres           String?  @db.VarChar(120)
+  apellidos         String?  @db.VarChar(120)
+  fecha_nacimiento  DateTime? @db.Date
+  sector_residencia String?  @db.VarChar(120)
+  creado_en         DateTime @default(now()) @db.Timestamptz(3)
+  usuario           Usuario?
+
+  @@map("persona")
+}
+
+model Usuario {
+  id_usuario           String                   @id @default(uuid()) @db.Uuid
+  id_persona           String                   @unique @db.Uuid
+  google_subject       String                   @unique @db.VarChar(255)
+  correo               String                   @db.VarChar(255)
+  correo_verificado    Boolean
+  perfil_completo      Boolean
+  estado               EstadoUsuario            @default(activo)
+  puntos               Int                      @default(0)
+  estrellas            Decimal                  @default(5) @db.Decimal(3, 1)
+  creado_en            DateTime                 @default(now()) @db.Timestamptz(3)
+  actualizado_en       DateTime                 @default(now()) @updatedAt @db.Timestamptz(3)
+  persona              Persona                  @relation(fields: [id_persona], references: [id_persona], onDelete: Restrict)
+  roles                UsuarioRol[]
+  propuestas           Propuesta[]
+  actividades          Actividad[]
+  inscripciones        Inscripcion[]
+  auditorias           RegistroAuditoria[]
+  revisiones           RevisionAdministrativa[]
+  eventos_notificacion EventoNotificacion[]
+
+  @@map("usuario")
+}
+
+model Rol {
+  id_rol      String       @id @default(uuid()) @db.Uuid
+  nombre      String       @unique @db.VarChar(40)
+  descripcion String?
+  usuarios    UsuarioRol[]
+
+  @@map("rol")
+}
+
+model UsuarioRol {
+  id_usuario_rol String   @id @default(uuid()) @db.Uuid
+  id_usuario     String   @db.Uuid
+  id_rol         String   @db.Uuid
+  asignado_en    DateTime @default(now()) @db.Timestamptz(3)
+  usuario        Usuario  @relation(fields: [id_usuario], references: [id_usuario], onDelete: Restrict)
+  rol            Rol      @relation(fields: [id_rol], references: [id_rol], onDelete: Restrict)
+
+  @@unique([id_usuario, id_rol])
+  @@index([id_rol])
+  @@map("usuario_rol")
+}
+
+model CategoriaActividad {
+  id_categoria String      @id @default(uuid()) @db.Uuid
+  codigo       String      @unique @db.VarChar(50)
+  nombre       String      @unique @db.VarChar(120)
+  habilitada   Boolean     @default(true)
+  propuestas   Propuesta[]
+
+  @@map("categoria_actividad")
+}
+
+model Propuesta {
+  id_propuesta           String                   @id @default(uuid()) @db.Uuid
+  id_proponente          String                   @db.Uuid
+  id_categoria           String                   @db.Uuid
+  id_propuesta_origen    String?                  @db.Uuid
+  titulo                 String                   @db.VarChar(180)
+  descripcion            String
+  finalidad_comunitaria  String
+  direccion_lugar        String                   @db.VarChar(255)
+  latitud_lugar          Decimal                  @db.Decimal(10, 7)
+  longitud_lugar         Decimal                  @db.Decimal(10, 7)
+  inicio_previsto        DateTime                 @db.Timestamptz(3)
+  fin_previsto           DateTime                 @db.Timestamptz(3)
+  cupo_maximo            Int
+  estado                 EstadoPropuesta          @default(pendiente_evaluacion)
+  version_actual         Int                      @default(1)
+  creada_en              DateTime                 @default(now()) @db.Timestamptz(3)
+  actualizada_en         DateTime                 @default(now()) @updatedAt @db.Timestamptz(3)
+  proponente             Usuario                  @relation(fields: [id_proponente], references: [id_usuario], onDelete: Restrict)
+  categoria              CategoriaActividad       @relation(fields: [id_categoria], references: [id_categoria], onDelete: Restrict)
+  propuesta_origen       Propuesta?               @relation("OrigenPropuesta", fields: [id_propuesta_origen], references: [id_propuesta], onDelete: Restrict)
+  propuestas_derivadas   Propuesta[]              @relation("OrigenPropuesta")
+  actividad              Actividad?
+  clave_creacion         String?                  @db.Uuid
+  solicitudes_evaluacion SolicitudEvaluacion[]
+  evaluaciones           EvaluacionIa[]
+  revisiones             RevisionAdministrativa[]
+
+  @@unique([id_proponente, clave_creacion])
+  @@index([id_proponente])
+  @@index([id_categoria])
+  @@index([id_propuesta_origen])
+  @@map("propuesta")
+}
+
+enum ResultadoEvaluacion {
+  favorable
+  requiere_revision
+  error
+
+  @@map("resultado_evaluacion")
+}
+
+enum DecisionRevision {
+  aprobada
+  rechazada
+
+  @@map("decision_revision")
+}
+
+model EvaluacionIa {
+  id_evaluacion           String                   @id @default(uuid()) @db.Uuid
+  id_propuesta            String                   @db.Uuid
+  version_politica        String                   @db.VarChar(50)
+  modelo_proveedor        String?                  @db.VarChar(120)
+  resultado               ResultadoEvaluacion
+  indicadores_json        Json
+  razones                 String?
+  respuesta_valida        Boolean
+  version_propuesta       Int
+  contenido_evaluado_json Json
+  registrada_en           DateTime                 @default(now()) @db.Timestamptz(3)
+  evento_clave            String?                  @unique @db.VarChar(180)
+  propuesta               Propuesta                @relation(fields: [id_propuesta], references: [id_propuesta], onDelete: Restrict)
+  revisiones              RevisionAdministrativa[]
+
+  @@index([id_propuesta, version_propuesta])
+  @@map("evaluacion_ia")
+}
+
+enum EstadoEntregaEvento {
+  pendiente
+  enviando
+  entregada
+
+  @@map("estado_entrega_evento")
+}
+
+enum EstadoEnvioCorreo {
+  pendiente
+  enviando
+  entregado
+
+  @@map("estado_envio_correo")
+}
+
+model EventoNotificacion {
+  id_evento       String              @id @default(uuid()) @db.Uuid
+  evento_clave    String              @unique @db.VarChar(180)
+  id_destinatario String              @db.Uuid
+  payload_json    Json
+  estado          EstadoEntregaEvento @default(pendiente)
+  intentos        Int                 @default(0)
+  token_reclamo   String?             @db.Uuid
+  reclamo_hasta   DateTime?           @db.Timestamptz(3)
+  proximo_intento DateTime            @default(now()) @db.Timestamptz(3)
+  ultimo_error    String?
+  creada_en       DateTime            @default(now()) @db.Timestamptz(3)
+  leida_en        DateTime?           @db.Timestamptz(3)
+  entregada_en    DateTime?           @db.Timestamptz(3)
+  destinatario    Usuario             @relation(fields: [id_destinatario], references: [id_usuario], onDelete: Restrict)
+  envio_correo    EnvioCorreo?
+
+  @@index([estado, proximo_intento])
+  @@map("evento_notificacion")
+}
+
+model EnvioCorreo {
+  id_envio        String            @id @default(uuid()) @db.Uuid
+  id_evento       String            @unique @db.Uuid
+  destinatario    String            @db.VarChar(255)
+  asunto          String            @db.VarChar(180)
+  cuerpo          String
+  estado          EstadoEnvioCorreo @default(pendiente)
+  intentos        Int               @default(0)
+  token_reclamo   String?           @db.Uuid
+  reclamo_hasta   DateTime?         @db.Timestamptz(3)
+  proximo_intento DateTime          @default(now()) @db.Timestamptz(3)
+  ultimo_error    String?
+  creada_en       DateTime          @default(now()) @db.Timestamptz(3)
+  entregada_en    DateTime?         @db.Timestamptz(3)
+  evento          EventoNotificacion @relation(fields: [id_evento], references: [id_evento], onDelete: Cascade)
+
+  @@index([estado, proximo_intento])
+  @@map("envio_correo")
+}
+
+model RevisionAdministrativa {
+  id_revision             String           @id @default(uuid()) @db.Uuid
+  id_propuesta            String           @db.Uuid
+  id_evaluacion           String?          @db.Uuid
+  id_administrador        String           @db.Uuid
+  decision                DecisionRevision
+  motivo                  String
+  version_propuesta       Int
+  contenido_revisado_json Json
+  decidida_en             DateTime         @default(now()) @db.Timestamptz(3)
+  propuesta               Propuesta        @relation(fields: [id_propuesta], references: [id_propuesta], onDelete: Restrict)
+  evaluacion              EvaluacionIa?    @relation(fields: [id_evaluacion], references: [id_evaluacion], onDelete: Restrict)
+  administrador           Usuario          @relation(fields: [id_administrador], references: [id_usuario], onDelete: Restrict)
+
+  @@unique([id_propuesta, version_propuesta])
+  @@map("revision_administrativa")
+}
+
+enum EstadoSolicitudEvaluacion {
+  pendiente
+  enviando
+  entregada
+  requiere_revision
+
+  @@map("estado_solicitud_evaluacion")
+}
+
+model SolicitudEvaluacion {
+  id_solicitud      String                    @id @default(uuid()) @db.Uuid
+  id_propuesta      String                    @db.Uuid
+  version_propuesta Int
+  evento_clave      String                    @unique @db.VarChar(180)
+  contenido_json    Json
+  estado            EstadoSolicitudEvaluacion @default(pendiente)
+  intentos          Int                       @default(0)
+  token_reclamo     String?                   @db.Uuid
+  reclamo_hasta     DateTime?                 @db.Timestamptz(3)
+  ultimo_error      String?
+  creada_en         DateTime                  @default(now()) @db.Timestamptz(3)
+  entregada_en      DateTime?                 @db.Timestamptz(3)
+  propuesta         Propuesta                 @relation(fields: [id_propuesta], references: [id_propuesta], onDelete: Restrict)
+
+  @@unique([id_propuesta, version_propuesta])
+  @@index([estado, reclamo_hasta])
+  @@map("solicitud_evaluacion")
+}
+
+model RegistroAuditoria {
+  id_auditoria           String   @id @default(uuid()) @db.Uuid
+  id_actor               String?  @db.Uuid
+  entidad_afectada       String   @db.VarChar(80)
+  identificador_afectado String   @db.Uuid
+  accion                 String   @db.VarChar(90)
+  estado_anterior        String?
+  estado_nuevo           String?
+  motivo                 String?
+  metadatos_json         Json?
+  evento_clave           String?  @unique @db.VarChar(180)
+  ocurrido_en            DateTime @default(now()) @db.Timestamptz(3)
+  actor                  Usuario? @relation(fields: [id_actor], references: [id_usuario], onDelete: Restrict)
+
+  @@index([entidad_afectada, identificador_afectado, ocurrido_en])
+  @@map("registro_auditoria")
+}
+
+model Actividad {
+  id_actividad            String          @id @default(uuid()) @db.Uuid
+  id_propuesta            String          @unique @db.Uuid
+  id_organizador_actual   String          @db.Uuid
+  estado                  EstadoActividad @default(publicada)
+  version_publicada       Int
+  contenido_aprobado_json Json
+  publicada_en            DateTime        @default(now()) @db.Timestamptz(3)
+  finalizada_en           DateTime?       @db.Timestamptz(3)
+  cancelada_en            DateTime?       @db.Timestamptz(3)
+  motivo_cancelacion      String?
+  propuesta               Propuesta       @relation(fields: [id_propuesta], references: [id_propuesta], onDelete: Restrict)
+  organizador_actual      Usuario         @relation(fields: [id_organizador_actual], references: [id_usuario], onDelete: Restrict)
+  inscripciones           Inscripcion[]
+
+  @@index([id_organizador_actual])
+  @@map("actividad")
+}
+
+model Inscripcion {
+  id_inscripcion                    String            @id @default(uuid()) @db.Uuid
+  id_usuario                        String            @db.Uuid
+  id_actividad                      String            @db.Uuid
+  estado                            EstadoInscripcion @default(activa)
+  inscrita_en                       DateTime          @default(now()) @db.Timestamptz(3)
+  cancelada_en                      DateTime?         @db.Timestamptz(3)
+  motivo_cancelacion                String?           @db.VarChar(255)
+  penalizacion_cancelacion_aplicada Boolean           @default(false)
+  reactivada_en                     DateTime?         @db.Timestamptz(3)
+  evento_cancelacion_actual         String?           @db.VarChar(180)
+  usuario                           Usuario           @relation(fields: [id_usuario], references: [id_usuario], onDelete: Restrict)
+  actividad                         Actividad         @relation(fields: [id_actividad], references: [id_actividad], onDelete: Restrict)
+
+  @@unique([id_usuario, id_actividad])
+  @@index([id_actividad, estado])
+  @@map("inscripcion")
+}

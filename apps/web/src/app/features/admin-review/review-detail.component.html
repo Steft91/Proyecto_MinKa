@@ -1,0 +1,124 @@
+<section class="proposal-page">
+  <a class="back-link" routerLink="/administracion/propuestas">← Volver a revisión</a>
+  @if (decision(); as saved) {
+    <div class="state-panel" role="status">
+      <h1>Decisión registrada</h1>
+      <p>La propuesta quedó {{ saved.estado }}.</p>
+      @if (saved.id_actividad) {
+        <a class="button-primary button-link" [routerLink]="['/actividades', saved.id_actividad]"
+          >Ver actividad publicada</a
+        >
+      }
+      <p><a routerLink="/administracion/propuestas">Volver a la cola de revisión</a></p>
+    </div>
+  } @else if (state(); as result) {
+    @if (result.loading) {
+      <p role="status">Cargando propuesta…</p>
+    } @else if (result.error) {
+      <div class="state-panel" role="alert">
+        <p>{{ result.error }}</p>
+        <button class="button-primary" (click)="retry()">Reintentar</button>
+      </div>
+    } @else if (result.proposal; as proposal) {
+      <header class="detail-heading">
+        <span class="category-tag"
+          >{{
+            proposal.estado === 'en_revision' ? 'En revisión administrativa' : 'Revisión cerrada'
+          }}
+          · Versión {{ proposal.version_actual }}</span
+        >
+        <h1>{{ proposal.titulo }}</h1>
+      </header>
+      <div class="detail-layout">
+        <div class="detail-description">
+          <h2>Descripción</h2>
+          <p>{{ proposal.descripcion }}</p>
+          <h2>Finalidad comunitaria</h2>
+          <p>{{ proposal.finalidad_comunitaria }}</p>
+          <h2>Evaluación y derivación</h2>
+          @if (proposal.evaluacion; as evaluation) {
+            <p>{{ evaluation.razones || 'La evaluación no incluye razones adicionales.' }}</p>
+            <ul>
+              @for (alert of alerts(evaluation.indicadores_json); track alert) {
+                <li>{{ alert }}</li>
+              }
+            </ul>
+            <p>
+              Política {{ evaluation.version_politica }} · Versión evaluada
+              {{ evaluation.version_propuesta }}
+            </p>
+          } @else {
+            <p>No hay una evaluación de IA disponible para esta versión.</p>
+          }
+          @if (proposal.motivo_derivacion) {
+            <div class="notice">{{ proposal.motivo_derivacion }}</div>
+          }
+        </div>
+        <aside class="detail-facts">
+          <h2>Datos propuestos</h2>
+          <dl>
+            <div>
+              <dt>Lugar</dt>
+              <dd>{{ proposal.direccion_lugar }}</dd>
+            </div>
+            <div>
+              <dt>Inicio</dt>
+              <dd>{{ proposal.inicio_previsto | date: 'd MMM y, HH:mm' : '-0500' }}</dd>
+            </div>
+            <div>
+              <dt>Finalización</dt>
+              <dd>{{ proposal.fin_previsto | date: 'd MMM y, HH:mm' : '-0500' }}</dd>
+            </div>
+            <div>
+              <dt>Cupo máximo</dt>
+              <dd>{{ proposal.cupo_maximo }}</dd>
+            </div>
+            <div>
+              <dt>Coordenadas del lugar</dt>
+              <dd>{{ proposal.latitud_lugar }}, {{ proposal.longitud_lugar }}</dd>
+            </div>
+          </dl>
+        </aside>
+      </div>
+      @if (proposal.estado === 'en_revision') {
+        <form
+          class="proposal-form decision-form"
+          [formGroup]="form"
+          (ngSubmit)="submit()"
+          novalidate
+        >
+          <fieldset>
+            <legend>Registrar decisión</legend>
+            <div class="form-field">
+              <label for="decision">Decisión</label
+              ><select id="decision" formControlName="decision">
+                <option value="">Selecciona una decisión</option>
+                <option value="aprobar">Aprobar y publicar</option>
+                <option value="rechazar">Rechazar</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="motivo">Motivo de la decisión</label
+              ><textarea id="motivo" rows="4" formControlName="motivo"></textarea>
+              @if (form.controls.motivo.touched && form.controls.motivo.invalid) {
+                <p class="field-error">Escribe el motivo de tu decisión.</p>
+              }
+            </div>
+            <p class="form-help">
+              La decisión se registrará sobre la versión {{ proposal.version_actual }}.
+            </p>
+            @if (error()) {
+              <p class="notice notice-error" role="alert">{{ error() }}</p>
+              <button class="button-text" type="button" (click)="retry()">
+                Actualizar propuesta
+              </button>
+            }
+            <button class="button-primary" type="submit" [disabled]="saving() || form.invalid">
+              {{ saving() ? 'Guardando…' : 'Confirmar decisión' }}
+            </button>
+          </fieldset>
+        </form>
+      }
+    }
+  }
+</section>
