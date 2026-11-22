@@ -50,6 +50,24 @@ El empaquetado debe ser reproducible aunque el entorno no tenga acceso a interne
 - No cambia el contrato ni la lógica de negocio.
 - Si se desea una fuente propia, deberá incorporarse como asset versionado.
 
+## 2026-11-22 — Cola independiente de correo
+
+### Decisión
+
+La notificación interna y el envío por Gmail se persisten en canales separados. Cada
+evento crea como máximo un registro `envio_correo`, identificado por `id_evento`.
+
+### Motivo
+
+Un fallo de Gmail no debe revertir la operación de negocio ni impedir que el usuario
+vea su aviso dentro de Minka.
+
+### Impacto
+
+- `envio_correo` tiene estado, intentos, reclamo y próximo reintento.
+- Gmail se procesa con OAuth mediante `GmailApiEmailSender`.
+- La entrega interna mantiene su propio dispatcher e idempotencia.
+
 ## 2026-11-21 — Perfil OAuth inicialmente incompleto
 
 ### Decisión
