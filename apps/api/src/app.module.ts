@@ -9,6 +9,7 @@ import { ProposalsModule } from './modules/proposals/proposals.module.js';
 import { AdminReviewModule } from './modules/admin-review/admin-review.module.js';
 import { EvaluationResultsModule } from './modules/evaluation-results/evaluation-results.module.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
+import { RegistrationModule } from './modules/registrations/registration.module.js';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { IdentityModule } from './modules/identity/identity.module.js';
     AdminReviewModule,
     EvaluationResultsModule,
     IdentityModule,
+    RegistrationModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],
