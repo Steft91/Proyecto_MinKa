@@ -1,5 +1,7 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import type { SessionRequest } from '../access-control/session-request.js';
 import { GoogleAuthDto } from './google-auth.dto.js';
+import { GoogleSessionGuard } from './google-session.guard.js';
 import { GoogleTokenVerifier } from './google-token-verifier.js';
 import { IdentityService } from './identity.service.js';
 
@@ -16,4 +18,9 @@ export class IdentityController {
     return this.identity.loginWithGoogle(claims);
   }
 
+  @Get('me')
+  @UseGuards(GoogleSessionGuard)
+  me(@Req() request: SessionRequest) {
+    return request.sesion;
+  }
 }
