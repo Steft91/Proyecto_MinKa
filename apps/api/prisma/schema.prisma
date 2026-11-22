@@ -202,6 +202,7 @@ model EventoNotificacion {
   proximo_intento DateTime            @default(now()) @db.Timestamptz(3)
   ultimo_error    String?
   creada_en       DateTime            @default(now()) @db.Timestamptz(3)
+  leida_en        DateTime?           @db.Timestamptz(3)
   entregada_en    DateTime?           @db.Timestamptz(3)
   destinatario    Usuario             @relation(fields: [id_destinatario], references: [id_usuario], onDelete: Restrict)
 
