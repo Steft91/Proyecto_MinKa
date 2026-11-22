@@ -46,10 +46,10 @@ enum EstadoInscripcion {
 
 model Persona {
   id_persona        String   @id @default(uuid()) @db.Uuid
-  nombres           String   @db.VarChar(120)
-  apellidos         String   @db.VarChar(120)
-  fecha_nacimiento  DateTime @db.Date
-  sector_residencia String   @db.VarChar(120)
+  nombres           String?  @db.VarChar(120)
+  apellidos         String?  @db.VarChar(120)
+  fecha_nacimiento  DateTime? @db.Date
+  sector_residencia String?  @db.VarChar(120)
   creado_en         DateTime @default(now()) @db.Timestamptz(3)
   usuario           Usuario?
 
@@ -190,6 +190,14 @@ enum EstadoEntregaEvento {
   @@map("estado_entrega_evento")
 }
 
+enum EstadoEnvioCorreo {
+  pendiente
+  enviando
+  entregado
+
+  @@map("estado_envio_correo")
+}
+
 model EventoNotificacion {
   id_evento       String              @id @default(uuid()) @db.Uuid
   evento_clave    String              @unique @db.VarChar(180)
@@ -202,11 +210,33 @@ model EventoNotificacion {
   proximo_intento DateTime            @default(now()) @db.Timestamptz(3)
   ultimo_error    String?
   creada_en       DateTime            @default(now()) @db.Timestamptz(3)
+  leida_en        DateTime?           @db.Timestamptz(3)
   entregada_en    DateTime?           @db.Timestamptz(3)
   destinatario    Usuario             @relation(fields: [id_destinatario], references: [id_usuario], onDelete: Restrict)
+  envio_correo    EnvioCorreo?
 
   @@index([estado, proximo_intento])
   @@map("evento_notificacion")
+}
+
+model EnvioCorreo {
+  id_envio        String            @id @default(uuid()) @db.Uuid
+  id_evento       String            @unique @db.Uuid
+  destinatario    String            @db.VarChar(255)
+  asunto          String            @db.VarChar(180)
+  cuerpo          String
+  estado          EstadoEnvioCorreo @default(pendiente)
+  intentos        Int               @default(0)
+  token_reclamo   String?           @db.Uuid
+  reclamo_hasta   DateTime?         @db.Timestamptz(3)
+  proximo_intento DateTime          @default(now()) @db.Timestamptz(3)
+  ultimo_error    String?
+  creada_en       DateTime          @default(now()) @db.Timestamptz(3)
+  entregada_en    DateTime?         @db.Timestamptz(3)
+  evento          EventoNotificacion @relation(fields: [id_evento], references: [id_evento], onDelete: Cascade)
+
+  @@index([estado, proximo_intento])
+  @@map("envio_correo")
 }
 
 model RevisionAdministrativa {

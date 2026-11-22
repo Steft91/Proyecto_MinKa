@@ -3,6 +3,20 @@ import { Routes } from '@angular/router';
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'actividades' },
   {
+    path: 'perfil/completar',
+    loadComponent: () =>
+      import('./features/identity/complete-profile.component').then(
+        (m) => m.CompleteProfileComponent,
+      ),
+  },
+  {
+    path: 'notificaciones',
+    loadComponent: () =>
+      import('./features/notifications/notifications-list.component').then(
+        (m) => m.NotificationsListComponent,
+      ),
+  },
+  {
     path: 'actividades',
     loadComponent: () =>
       import('./features/catalog/activity-catalog.component').then(

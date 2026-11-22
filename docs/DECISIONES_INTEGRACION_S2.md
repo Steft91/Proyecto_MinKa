@@ -33,3 +33,56 @@ de convertirlo en la base oficial de Sprint 3.
 
 Todo cambio que afecte API, DTO, migraciones, eventos o contratos se registra aquí con
 fecha, motivo, impacto y pruebas requeridas antes de integrar.
+
+## 2026-11-21 — Fuentes del frontend sin dependencia de red
+
+### Decisión
+
+El build no descargará fuentes desde Google Fonts. Se usará una pila local del sistema.
+
+### Motivo
+
+El empaquetado debe ser reproducible aunque el entorno no tenga acceso a internet.
+
+### Impacto
+
+- Se eliminó la importación remota de `src/styles.scss`.
+- No cambia el contrato ni la lógica de negocio.
+- Si se desea una fuente propia, deberá incorporarse como asset versionado.
+
+## 2026-11-22 — Cola independiente de correo
+
+### Decisión
+
+La notificación interna y el envío por Gmail se persisten en canales separados. Cada
+evento crea como máximo un registro `envio_correo`, identificado por `id_evento`.
+
+### Motivo
+
+Un fallo de Gmail no debe revertir la operación de negocio ni impedir que el usuario
+vea su aviso dentro de Minka.
+
+### Impacto
+
+- `envio_correo` tiene estado, intentos, reclamo y próximo reintento.
+- Gmail se procesa con OAuth mediante `GmailApiEmailSender`.
+- La entrega interna mantiene su propio dispatcher e idempotencia.
+
+## 2026-11-21 — Perfil OAuth inicialmente incompleto
+
+### Decisión
+
+El login de Google puede crear una cuenta con perfil incompleto. Los datos de perfil
+obligatorios, incluida la fecha de nacimiento, se completan después mediante HU01.
+
+### Motivo
+
+Google autentica la identidad, pero no proporciona todos los datos funcionales que Minka
+necesita para validar mayoría de edad y habilitar propuestas.
+
+### Impacto
+
+- Los campos de perfil pendientes son anulables en `persona`.
+- Una sesión con perfil incompleto no puede proponer.
+- Los servicios que calculan mayoría de edad deben tratar una fecha nula como `false`.
+- La migración `20261121120000_perfil_pendiente` acompaña el cambio.

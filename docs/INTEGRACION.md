@@ -37,12 +37,12 @@ Tipos permitidos:
 Ejemplos:
 
 ```text
-chore(init): scaffold monorepo
-feat(identity): validate Google email
-feat(ai): validate Gemini evaluation response
-test(registrations): prevent duplicate booking
-fix(notifications): retry failed email delivery
-docs(api): document UsuarioResumen contract
+chore(inicializacion): preparar monorepo
+feat(identidad): validar correo de Google
+feat(ia): validar respuesta de evaluacion Gemini
+test(inscripciones): evitar inscripcion duplicada
+fix(notificaciones): reintentar envio de correo fallido
+docs(api): documentar contrato UsuarioResumen
 ```
 
 Cada commit debe representar un cambio real y comprobable. No crear commits vacíos,

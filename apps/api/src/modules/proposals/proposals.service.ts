@@ -275,6 +275,7 @@ export class ProposalsService {
       correo_verificado: usuario.correo_verificado,
       perfil_completo: usuario.perfil_completo,
       mayor_edad:
+        usuario.persona.fecha_nacimiento !== null &&
         usuario.persona.fecha_nacimiento.toISOString().slice(0, 10) <= cutoff,
       estado: usuario.estado,
       puntos: usuario.puntos,
