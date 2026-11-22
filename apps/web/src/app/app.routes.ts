@@ -10,6 +10,13 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'notificaciones',
+    loadComponent: () =>
+      import('./features/notifications/notifications-list.component').then(
+        (m) => m.NotificationsListComponent,
+      ),
+  },
+  {
     path: 'actividades',
     loadComponent: () =>
       import('./features/catalog/activity-catalog.component').then(
