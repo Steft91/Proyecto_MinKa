@@ -5,6 +5,8 @@ import type { SolicitudEvaluacion } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../database/prisma.service.js';
 import { EvaluationGateway } from './evaluation.gateway.js';
 import { AuditService } from '../audit/audit.service.js';
+import { GeminiEvaluationAdapter } from '../ai-evaluation/gemini-evaluation.adapter.js';
+import { EvaluationResultsService } from '../evaluation-results/evaluation-results.service.js';
 import { NotificationEventsService } from '../notification-events/notification-events.service.js';
 
 @Injectable()
@@ -16,6 +18,8 @@ export class EvaluationDispatchService
   constructor(
     private readonly prisma: PrismaService,
     private readonly gateway: EvaluationGateway,
+    private readonly gemini: GeminiEvaluationAdapter,
+    private readonly results: EvaluationResultsService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationEventsService,
   ) {}
@@ -36,7 +40,8 @@ export class EvaluationDispatchService
   }
 
   async dispatchOne(): Promise<boolean> {
-    if (!this.gateway.isConfigured()) return false;
+    const useExternalGateway = this.gateway.isConfigured();
+    if (!useExternalGateway && !this.gemini.isConfigured()) return false;
     const token = randomUUID();
     const solicitud = await this.prisma.client.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<SolicitudEvaluacion[]>`
@@ -60,10 +65,17 @@ export class EvaluationDispatchService
     if (!solicitud) return false;
 
     try {
-      await this.gateway.submit(
-        solicitud.contenido_json as unknown as PropuestaEvaluable,
-        solicitud.evento_clave,
-      );
+      const proposal = solicitud.contenido_json as unknown as PropuestaEvaluable;
+      if (!useExternalGateway) {
+        const result = await this.gemini.evaluate(proposal);
+        await this.results.apply(result, solicitud.evento_clave, {
+          id: solicitud.id_solicitud,
+          token,
+        });
+        return true;
+      }
+
+      await this.gateway.submit(proposal, solicitud.evento_clave);
       await this.prisma.client.solicitudEvaluacion.updateMany({
         where: {
           id_solicitud: solicitud.id_solicitud,

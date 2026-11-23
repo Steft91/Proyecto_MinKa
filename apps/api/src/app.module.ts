@@ -9,7 +9,6 @@ import { ProposalsModule } from './modules/proposals/proposals.module.js';
 import { AdminReviewModule } from './modules/admin-review/admin-review.module.js';
 import { EvaluationResultsModule } from './modules/evaluation-results/evaluation-results.module.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
-import { AiEvaluationModule } from './modules/ai-evaluation/ai-evaluation.module.js';
 
 @Module({
   imports: [
@@ -20,7 +19,6 @@ import { AiEvaluationModule } from './modules/ai-evaluation/ai-evaluation.module
     AdminReviewModule,
     EvaluationResultsModule,
     IdentityModule,
-    AiEvaluationModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

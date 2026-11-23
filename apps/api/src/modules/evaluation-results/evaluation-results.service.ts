@@ -24,7 +24,11 @@ export class EvaluationResultsService {
     private readonly notifications: NotificationEventsService,
   ) {}
 
-  async apply(input: EvaluationResultDto, key: string) {
+  async apply(
+    input: EvaluationResultDto,
+    key: string,
+    claim?: { id: string; token: string },
+  ) {
     input = plainToInstance(EvaluationResultDto, input);
     if (
       !key?.trim() ||
@@ -38,6 +42,29 @@ export class EvaluationResultsService {
           'La evaluación debe cumplir el contrato y tener una clave de evento.',
       });
     return this.prisma.client.$transaction(async (tx) => {
+      if (claim) {
+        const updated = await tx.solicitudEvaluacion.updateMany({
+          where: {
+            id_solicitud: claim.id,
+            estado: 'enviando',
+            token_reclamo: claim.token,
+            id_propuesta: input.id_propuesta,
+            version_propuesta: input.version_propuesta,
+            evento_clave: key,
+          },
+          data: {
+            estado: 'entregada',
+            entregada_en: new Date(),
+            reclamo_hasta: null,
+            token_reclamo: null,
+            ultimo_error: null,
+          },
+        });
+        if (!updated.count) {
+          throw new ConflictException('La solicitud de evaluación ya no pertenece a este proceso.');
+        }
+      }
+
       const initial = await tx.propuesta.findUnique({
         where: { id_propuesta: input.id_propuesta },
         select: { id_proponente: true },

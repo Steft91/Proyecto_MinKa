@@ -25,18 +25,22 @@ type GeminiContentResponse = {
 export class GeminiEvaluationAdapter {
   private readonly policyVersion = 'minka-hu05-v1';
 
+  isConfigured(): boolean {
+    return Boolean(process.env.GEMINI_API_KEY?.trim());
+  }
+
   async evaluate(input: PropuestaEvaluable): Promise<ResultadoEvaluacion> {
-    const apiKey = process.env.GEMINI_API_KEY;
-    const model = process.env.GEMINI_MODEL ?? 'gemini-2.0-flash';
+    const apiKey = process.env.GEMINI_API_KEY?.trim();
+    const model = process.env.GEMINI_MODEL?.trim() || 'gemini-3.5-flash-lite';
     if (!apiKey) {
       throw new ServiceUnavailableException('GEMINI_API_KEY no está configurada.');
     }
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
         body: JSON.stringify({
           system_instruction: {
             parts: [
@@ -57,6 +61,23 @@ export class GeminiEvaluationAdapter {
           ],
           generationConfig: {
             responseMimeType: 'application/json',
+            responseJsonSchema: {
+              type: 'object',
+              properties: {
+                resultado: { type: 'string', enum: ['favorable', 'requiere_revision'] },
+                indicadores_json: {
+                  type: 'object',
+                  properties: Object.fromEntries(
+                    indicatorNames.map((name) => [name, { type: 'boolean' }]),
+                  ),
+                  required: indicatorNames,
+                  additionalProperties: false,
+                },
+                razones: { type: ['string', 'null'] },
+              },
+              required: ['resultado', 'indicadores_json', 'razones'],
+              additionalProperties: false,
+            },
           },
         }),
         signal: AbortSignal.timeout(15000),
@@ -82,7 +103,7 @@ export class GeminiEvaluationAdapter {
       if (resultado !== 'favorable' && resultado !== 'requiere_revision') {
         return this.invalidResult(input, 'Resultado no permitido.');
       }
-      if (resultado === 'favorable' && Object.values(indicators).some(Boolean)) {
+      if (resultado === 'favorable' && indicatorNames.some((name) => indicators[name])) {
         return this.invalidResult(input, 'Una alerta no puede producir resultado favorable.');
       }
       return {
@@ -120,6 +141,7 @@ export class GeminiEvaluationAdapter {
   private isIndicators(value: unknown): value is IndicadoresEvaluacion {
     return (
       this.isObject(value) &&
+      Object.keys(value).length === indicatorNames.length &&
       indicatorNames.every((name) => typeof value[name] === 'boolean')
     );
   }

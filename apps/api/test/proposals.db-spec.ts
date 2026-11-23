@@ -32,6 +32,7 @@ describe('Propuestas y entrega a evaluación con PostgreSQL', () => {
   const originalUrl = process.env.MINKA_EVALUATION_URL;
   const originalToken = process.env.MINKA_EVALUATION_TOKEN;
   const originalIntegration = {
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     MINKA_EVALUATION_CALLBACK_TOKEN:
       process.env.MINKA_EVALUATION_CALLBACK_TOKEN,
     MINKA_NOTIFICATIONS_URL: process.env.MINKA_NOTIFICATIONS_URL,
@@ -197,6 +198,7 @@ describe('Propuestas y entrega a evaluación con PostgreSQL', () => {
   });
 
   beforeEach(async () => {
+    delete process.env.GEMINI_API_KEY;
     failNotifications = false;
     notificationKeys.length = 0;
     process.env.MINKA_EVALUATION_CALLBACK_TOKEN = 'callback-de-prueba';
@@ -647,6 +649,49 @@ describe('Propuestas y entrega a evaluación con PostgreSQL', () => {
       .set('Authorization', 'Bearer callback-de-prueba')
       .set('Idempotency-Key', key)
       .send(body);
+
+  it.each([
+    { result: 'favorable', expected: 'aprobada', published: 1 },
+    { result: 'requiere_revision', expected: 'en_revision', published: 0 },
+    { result: 'malformed', expected: 'en_revision', published: 0 },
+    { result: 'unavailable', expected: 'en_revision', published: 0 },
+  ])('procesa Gemini desde la cola con resultado $result', async ({ result, expected, published }) => {
+    const { body } = await crear().expect(201);
+    process.env.GEMINI_API_KEY = 'gemini-local-fixture';
+    const indicators = outcome(body.id_propuesta).indicadores_json;
+    indicators.ambiguedad = result === 'requiere_revision';
+    const gemini = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      if (result === 'unavailable') return new Response(null, { status: 503 });
+      const text = result === 'malformed' ? 'no-json' : JSON.stringify({
+        resultado: result,
+        indicadores_json: indicators,
+        razones: result === 'requiere_revision' ? 'La propuesta es ambigua.' : null,
+      });
+      return Response.json({ candidates: [{ content: { parts: [{ text }] } }] });
+    });
+    try {
+      const dispatches = await Promise.all([dispatcher.dispatchOne(), dispatcher.dispatchOne()]);
+      expect(dispatches.sort()).toEqual([false, true]);
+      expect(gemini).toHaveBeenCalledTimes(1);
+      expect(await prisma.propuesta.findUniqueOrThrow({
+        where: { id_propuesta: body.id_propuesta },
+        select: { estado: true },
+      })).toEqual({ estado: expected });
+      expect(await prisma.actividad.count({
+        where: { id_propuesta: body.id_propuesta },
+      })).toBe(published);
+      const submission = await prisma.solicitudEvaluacion.findFirstOrThrow({
+        where: { id_propuesta: body.id_propuesta },
+      });
+      expect(submission.estado).toBe(result === 'unavailable' ? 'requiere_revision' : 'entregada');
+      expect(await prisma.evaluacionIa.count({
+        where: { id_propuesta: body.id_propuesta },
+      })).toBe(result === 'unavailable' ? 0 : 1);
+      expect(await dispatcher.dispatchOne()).toBe(false);
+    } finally {
+      gemini.mockRestore();
+    }
+  });
 
   it('aplica una evaluación favorable, publica, audita y genera un único aviso', async () => {
     const { body } = await crear().expect(201);
