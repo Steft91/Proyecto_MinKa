@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { IdentityModule } from '../identity/identity.module.js';
 import { PrismaModule } from '../../database/prisma.module.js';
 import { AccessControlModule } from '../access-control/access-control.module.js';
 import { AuditModule } from '../audit/audit.module.js';
@@ -10,6 +11,7 @@ import { NotificationEventsModule } from '../notification-events/notification-ev
 @Module({
   imports: [
     PrismaModule,
+    IdentityModule,
     AccessControlModule,
     AuditModule,
     ProposalsModule,

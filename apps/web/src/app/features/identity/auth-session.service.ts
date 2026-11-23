@@ -14,7 +14,12 @@ export class AuthSessionService {
   loginWithGoogle(idToken: string): Observable<SesionActual> {
     return this.http
       .post<SesionActual>('/api/v1/auth/google', { idToken })
-      .pipe(tap(() => localStorage.setItem(tokenKey, idToken)));
+      .pipe(
+        tap((session) => {
+          sessionStorage.setItem(tokenKey, idToken);
+          this.session.set(session);
+        }),
+      );
   }
 
   loadSession(): Observable<SesionActual> {
@@ -24,11 +29,11 @@ export class AuthSessionService {
   }
 
   token(): string | null {
-    return localStorage.getItem(tokenKey);
+    return sessionStorage.getItem(tokenKey);
   }
 
   logout(): void {
-    localStorage.removeItem(tokenKey);
+    sessionStorage.removeItem(tokenKey);
     this.session.set(null);
   }
 }

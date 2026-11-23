@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { AppModule } from '../../api/dist/app.module.js';
 import { configureApp } from '../../api/dist/configure-app.js';
 import { createPrismaClient } from '../../api/dist/database/prisma-client.js';
+import { GoogleTokenVerifier } from '../../api/dist/modules/identity/google-token-verifier.js';
 import { EvaluationDispatchService } from '../../api/dist/modules/proposals/evaluation-dispatch.service.js';
 
 const prisma = createPrismaClient();
@@ -17,8 +18,7 @@ const file = join(dir, 'test-only.geojson');
 const previous = process.env.MINKA_NEIGHBORHOOD_GEOJSON;
 let app;
 let apiUrl: string;
-let session;
-let adminSession;
+const claims = new Map<string, { sub: string; email: string; email_verified: boolean }>();
 
 test.beforeAll(async () => {
   writeFileSync(
@@ -55,17 +55,7 @@ test.beforeAll(async () => {
   });
   users.push(user.id_usuario);
   people.push(user.id_persona);
-  session = {
-    id_usuario: user.id_usuario,
-    correo: user.correo,
-    correo_verificado: true,
-    perfil_completo: true,
-    mayor_edad: true,
-    estado: 'activo',
-    roles: ['ciudadano'],
-    puntos: 0,
-    estrellas: 5,
-  };
+  claims.set('owner', { sub: user.google_subject, email: user.correo, email_verified: true });
   const admin = await prisma.usuario.create({
     data: {
       google_subject: `prueba-${randomUUID()}`,
@@ -86,18 +76,19 @@ test.beforeAll(async () => {
   people.push(admin.id_persona);
   const role = await prisma.rol.findUniqueOrThrow({ where: { nombre: 'administrador' } });
   await prisma.usuarioRol.create({ data: { id_usuario: admin.id_usuario, id_rol: role.id_rol } });
-  adminSession = { ...session, id_usuario: admin.id_usuario, roles: ['administrador'] };
+  claims.set('admin', { sub: admin.google_subject, email: admin.correo, email_verified: true });
   const module = await Test.createTestingModule({ imports: [AppModule] })
+    .overrideProvider(GoogleTokenVerifier)
+    .useValue({ verify: async (token: string) => {
+      const identity = claims.get(token);
+      if (!identity) throw new Error('Credencial de prueba desconocida');
+      return identity;
+    } })
     .overrideProvider(EvaluationDispatchService)
     .useValue({})
     .compile();
   app = module.createNestApplication();
   configureApp(app);
-  app.use((req, _res, next) => {
-    if (req.headers['x-test-session'] === 'owner') req.sesion = session;
-    if (req.headers['x-test-session'] === 'admin') req.sesion = adminSession;
-    next();
-  });
   await app.listen(0, '127.0.0.1');
   apiUrl = await app.getUrl();
 });
@@ -133,7 +124,7 @@ test.beforeEach(async ({ page }) => {
     const url = new URL(route.request().url());
     const response = await route.fetch({
       url: apiUrl + url.pathname + url.search,
-      headers: { ...route.request().headers(), 'x-test-session': 'owner' },
+      headers: { ...route.request().headers(), authorization: 'Bearer owner' },
     });
     await route.fulfill({ response });
   });
@@ -207,7 +198,7 @@ test('administración revisa, justifica y publica desde una pantalla móvil', as
   page,
 }, testInfo) => {
   const response = await page.request.post(`${apiUrl}/api/v1/proposals`, {
-    headers: { 'x-test-session': 'owner' },
+    headers: { authorization: 'Bearer owner' },
     data: {
       categoria_codigo: 'reciclaje',
       titulo: 'Propuesta para revisión administrativa',
@@ -231,7 +222,7 @@ test('administración revisa, justifica y publica desde una pantalla móvil', as
     const url = new URL(route.request().url());
     const result = await route.fetch({
       url: apiUrl + url.pathname + url.search,
-      headers: { ...route.request().headers(), 'x-test-session': 'admin' },
+      headers: { ...route.request().headers(), authorization: 'Bearer admin' },
     });
     await route.fulfill({ response: result });
   });
@@ -262,4 +253,53 @@ test('administración revisa, justifica y publica desde una pantalla móvil', as
 test('un ciudadano no accede a la revisión administrativa', async ({ page }) => {
   await page.goto('/administracion/propuestas');
   await expect(page.getByRole('alert')).toContainText('requiere una cuenta administradora');
+});
+
+test('entra con Google simulado, completa el perfil y accede a Mis propuestas', async ({ page }) => {
+  const identity = { sub: `prueba-${randomUUID()}`, email: 'login@example.invalid', email_verified: true };
+  claims.set('login-fixture', identity);
+  await page.unroute('**/api/**');
+  await page.route('**/api/**', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith('/auth/google/config')) {
+      await route.fulfill({ json: { clientId: 'browser-test.apps.googleusercontent.com' } });
+      return;
+    }
+    await route.fulfill({ response: await route.fetch({ url: apiUrl + url.pathname + url.search }) });
+  });
+  await page.route('https://accounts.google.com/gsi/client', (route) =>
+    route.fulfill({
+      contentType: 'application/javascript',
+      body: `window.google = { accounts: { id: {
+        initialize(options) { this.callback = options.callback; },
+        renderButton(container) {
+          const button = document.createElement('button');
+          button.textContent = 'Iniciar sesión con Google';
+          button.onclick = () => this.callback({ credential: 'login-fixture' });
+          container.append(button);
+        }
+      } } };`,
+    }),
+  );
+  try {
+    await page.goto('/iniciar-sesion');
+    await page.getByRole('button', { name: 'Iniciar sesión con Google' }).click();
+    await expect(page.getByRole('heading', { name: 'Completa tu perfil' })).toBeVisible();
+    await page.getByLabel('Nombres').fill('Prueba');
+    await page.getByLabel('Apellidos').fill('Integración');
+    await page.getByLabel('Fecha de nacimiento').fill('1990-01-01');
+    await page.getByLabel('Sector de residencia').fill('La Mena 2');
+    const myProposals = page.waitForResponse((r) => r.url().endsWith('/api/v1/proposals/me'));
+    await page.getByRole('button', { name: 'Guardar perfil' }).click();
+    expect((await myProposals).status()).toBe(200);
+    await expect(page.getByRole('heading', { name: 'Mis propuestas', exact: true })).toBeVisible();
+    await page.goto('/administracion/propuestas');
+    await expect(page.getByRole('alert')).toContainText('requiere una cuenta administradora');
+  } finally {
+    const user = await prisma.usuario.findUnique({ where: { google_subject: identity.sub } });
+    if (user) {
+      users.push(user.id_usuario);
+      people.push(user.id_persona);
+    }
+  }
 });

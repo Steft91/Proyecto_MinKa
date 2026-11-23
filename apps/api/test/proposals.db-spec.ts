@@ -20,6 +20,7 @@ import { CatalogModule } from '../src/modules/catalog/catalog.module.js';
 import { EvaluationResultsModule } from '../src/modules/evaluation-results/evaluation-results.module.js';
 import { EvaluationResultsService } from '../src/modules/evaluation-results/evaluation-results.service.js';
 import { NotificationEventsService } from '../src/modules/notification-events/notification-events.service.js';
+import { GoogleSessionGuard } from '../src/modules/identity/google-session.guard.js';
 import type { SessionRequest } from '../src/modules/access-control/session-request.js';
 
 describe('Propuestas y entrega a evaluación con PostgreSQL', () => {
@@ -128,7 +129,10 @@ describe('Propuestas y entrega a evaluación con PostgreSQL', () => {
         CatalogModule,
         EvaluationResultsModule,
       ],
-    }).compile();
+    })
+      .overrideGuard(GoogleSessionGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
     dispatcher = module.get(EvaluationDispatchService);
     gateway = module.get(EvaluationGateway);
     sesiones.admin = { ...sesiones.other, roles: ['administrador'] };
