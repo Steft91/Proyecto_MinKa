@@ -216,6 +216,7 @@ model EventoNotificacion {
   envio_correo    EnvioCorreo?
 
   @@index([estado, proximo_intento])
+  @@index([id_destinatario, leida_en], map: "evento_notificacion_destinatario_leida_idx")
   @@map("evento_notificacion")
 }
 
