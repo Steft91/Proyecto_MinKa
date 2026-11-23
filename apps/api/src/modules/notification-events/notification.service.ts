@@ -13,11 +13,11 @@ export class NotificationService {
       orderBy: { creada_en: 'desc' },
     });
     return rows.map((row) => ({
+      ...(row.payload_json as Record<string, unknown>),
       id: row.id_evento,
       eventKey: row.evento_clave,
       leida: row.leida_en !== null,
       creadaEn: row.creada_en.toISOString(),
-      ...(row.payload_json as Record<string, unknown>),
     }));
   }
 
@@ -26,12 +26,13 @@ export class NotificationService {
     id: string,
   ): Promise<{ id: string; leida: true }> {
     const userId = this.requireUser(sesion);
+    const where = { id_evento: id, id_destinatario: userId };
     const result = await this.prisma.client.eventoNotificacion.updateMany({
-      where: { id_evento: id, id_destinatario: userId },
+      where: { ...where, leida_en: null },
       data: { leida_en: new Date() },
     });
-    if (!result.count) {
-      throw new UnauthorizedException({
+    if (!result.count && !(await this.prisma.client.eventoNotificacion.count({ where }))) {
+      throw new NotFoundException({
         codigo: 'NOTIFICACION_NO_ENCONTRADA',
         mensaje: 'La notificación no existe o no pertenece a tu cuenta.',
       });
@@ -41,7 +42,7 @@ export class NotificationService {
 
   private requireUser(sesion: SesionActual | undefined): string {
     if (!sesion) {
-      throw new NotFoundException({
+      throw new UnauthorizedException({
         codigo: 'NO_AUTENTICADO',
         mensaje: 'Necesitas iniciar sesión para consultar notificaciones.',
       });

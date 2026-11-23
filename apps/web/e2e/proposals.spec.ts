@@ -248,6 +248,19 @@ test('administración revisa, justifica y publica desde una pantalla móvil', as
     page.getByRole('heading', { name: 'Propuesta para revisión administrativa' }),
   ).toBeVisible();
   await expect(page.getByText('20 cupos disponibles', { exact: true })).toBeVisible();
+  await page.unroute('**/api/**');
+  await page.route('**/api/**', async (route) => {
+    const url = new URL(route.request().url());
+    await route.fulfill({ response: await route.fetch({
+      url: apiUrl + url.pathname + url.search,
+      headers: { ...route.request().headers(), authorization: 'Bearer owner' },
+    }) });
+  });
+  await page.getByRole('link', { name: 'Notificaciones', exact: true }).click();
+  const notice = page.locator('article').filter({ hasText: 'Tu propuesta fue aprobada' });
+  await expect(notice).toBeVisible();
+  await notice.getByRole('button', { name: 'Marcar como leída' }).click();
+  await expect(notice.getByRole('button', { name: 'Marcar como leída' })).toHaveCount(0);
 });
 
 test('un ciudadano no accede a la revisión administrativa', async ({ page }) => {

@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Req,
   UseGuards,
@@ -25,8 +26,8 @@ export class NotificationController {
   @Patch(':id/read')
   markRead(
     @Req() request: SessionRequest,
-    @Param('id') id: string,
-    @Body() body: MarkNotificationDto,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() _body: MarkNotificationDto,
   ) {
     return this.notifications.markRead(request.sesion, id);
   }
