@@ -12,6 +12,11 @@ export class IdentityController {
     private readonly identity: IdentityService,
   ) {}
 
+  @Get('google/config')
+  googleConfig() {
+    return { clientId: process.env.GOOGLE_CLIENT_ID?.trim() || null };
+  }
+
   @Post('google')
   async google(@Body() body: GoogleAuthDto) {
     const claims = await this.verifier.verify(body.idToken);

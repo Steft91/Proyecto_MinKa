@@ -1,5 +1,7 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { Component, DestroyRef, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { finalize } from 'rxjs';
 import { NotificationsService } from './notifications.service';
 
 @Component({
@@ -12,9 +14,9 @@ import { NotificationsService } from './notifications.service';
         <h1>Notificaciones</h1>
         <span>{{ unreadCount() }} sin leer</span>
       </header>
-      <button type="button" (click)="reload()">Actualizar</button>
+      <button type="button" (click)="reload()" [disabled]="loading">Actualizar</button>
       <p *ngIf="loading">Cargando notificaciones…</p>
-      <p *ngIf="error" role="alert">No se pudieron cargar las notificaciones.</p>
+      <p *ngIf="error" role="alert">{{ error }}</p>
       <p *ngIf="!loading && !error && !items().length">No tienes notificaciones.</p>
       <article *ngFor="let item of items()" [class.unread]="!item.leida">
         <h2>{{ item.titulo }}</h2>
@@ -29,9 +31,10 @@ import { NotificationsService } from './notifications.service';
 })
 export class NotificationsListComponent {
   private readonly service = inject(NotificationsService);
+  private readonly destroy = inject(DestroyRef);
   readonly items = this.service.notifications;
   loading = false;
-  error = false;
+  error = '';
 
   unreadCount(): number {
     return this.items().filter((item) => !item.leida).length;
@@ -43,17 +46,19 @@ export class NotificationsListComponent {
 
   reload(): void {
     this.loading = true;
-    this.error = false;
-    this.service.loadMine().subscribe({
-      error: () => {
-        this.error = true;
-        this.loading = false;
-      },
-      complete: () => (this.loading = false),
+    this.error = '';
+    this.service.loadMine().pipe(
+      takeUntilDestroyed(this.destroy),
+      finalize(() => (this.loading = false)),
+    ).subscribe({
+      error: () => (this.error = 'No se pudieron cargar las notificaciones.'),
     });
   }
 
   read(id: string): void {
-    this.service.markRead(id).subscribe();
+    this.error = '';
+    this.service.markRead(id).pipe(takeUntilDestroyed(this.destroy)).subscribe({
+      error: () => (this.error = 'No se pudo marcar el aviso como leído.'),
+    });
   }
 }

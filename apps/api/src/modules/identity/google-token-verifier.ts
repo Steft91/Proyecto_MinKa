@@ -7,7 +7,7 @@ export class GoogleTokenVerifier {
   private readonly client = new OAuth2Client();
 
   async verify(idToken: string): Promise<GoogleIdentityClaims> {
-    const audience = process.env.GOOGLE_CLIENT_ID;
+    const audience = process.env.GOOGLE_CLIENT_ID?.trim();
     if (!audience) {
       throw new Error('GOOGLE_CLIENT_ID no está configurado.');
     }

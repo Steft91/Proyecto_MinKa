@@ -1,6 +1,7 @@
 import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
 import { IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 import { AdminGuard } from '../access-control/access-control.guards.js';
+import { GoogleSessionGuard } from '../identity/google-session.guard.js';
 import type { SessionRequest } from '../access-control/session-request.js';
 import { AuditService } from './audit.service.js';
 
@@ -14,7 +15,7 @@ class AuditQuery {
 }
 
 @Controller('admin/audit')
-@UseGuards(AdminGuard)
+@UseGuards(GoogleSessionGuard, AdminGuard)
 export class AuditController {
   constructor(private readonly audit: AuditService) {}
   @Get()

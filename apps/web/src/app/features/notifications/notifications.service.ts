@@ -19,6 +19,7 @@ export class NotificationsService {
   constructor(private readonly http: HttpClient) {}
 
   loadMine() {
+    this.notifications.set([]);
     return this.http
       .get<MinkaNotification[]>('/api/v1/notifications')
       .pipe(tap((items) => this.notifications.set(items)));

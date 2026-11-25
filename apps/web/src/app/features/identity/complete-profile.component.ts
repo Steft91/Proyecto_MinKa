@@ -2,6 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
+import { AuthSessionService } from './auth-session.service';
 import type { SesionActual } from '@minka/contracts';
 import { finalize } from 'rxjs';
 
@@ -26,6 +28,8 @@ import { finalize } from 'rxjs';
 })
 export class CompleteProfileComponent {
   private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
+  private readonly auth = inject(AuthSessionService);
   private readonly fb = inject(FormBuilder);
   readonly form = this.fb.nonNullable.group({
     nombres: ['', [Validators.required, Validators.maxLength(120)]],
@@ -43,7 +47,10 @@ export class CompleteProfileComponent {
       .patch<SesionActual>('/api/v1/profile/me', this.form.getRawValue())
       .pipe(finalize(() => (this.saving = false)))
       .subscribe({
-        next: () => (this.message = 'Perfil guardado correctamente.'),
+        next: (session) => {
+          this.auth.session.set(session);
+          void this.router.navigate(['/mis-propuestas']);
+        },
         error: () => (this.message = 'No se pudo guardar el perfil.'),
       });
   }

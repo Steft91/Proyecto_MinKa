@@ -20,7 +20,10 @@ export class GoogleSessionGuard implements CanActivate {
     const authorization = request.header('authorization');
     const [scheme, token] = authorization?.split(' ') ?? [];
     if (scheme?.toLowerCase() !== 'bearer' || !token) {
-      throw new UnauthorizedException('Se requiere un token de Google.');
+      throw new UnauthorizedException({
+        codigo: 'NO_AUTENTICADO',
+        mensaje: 'Inicia sesión para realizar esta operación.',
+      });
     }
     const claims = await this.verifier.verify(token);
     request.sesion = await this.identity.getSessionByGoogleSubject(claims.sub);

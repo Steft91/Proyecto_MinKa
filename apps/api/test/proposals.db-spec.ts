@@ -20,6 +20,7 @@ import { CatalogModule } from '../src/modules/catalog/catalog.module.js';
 import { EvaluationResultsModule } from '../src/modules/evaluation-results/evaluation-results.module.js';
 import { EvaluationResultsService } from '../src/modules/evaluation-results/evaluation-results.service.js';
 import { NotificationEventsService } from '../src/modules/notification-events/notification-events.service.js';
+import { GoogleSessionGuard } from '../src/modules/identity/google-session.guard.js';
 import type { SessionRequest } from '../src/modules/access-control/session-request.js';
 
 describe('Propuestas y entrega a evaluación con PostgreSQL', () => {
@@ -31,6 +32,9 @@ describe('Propuestas y entrega a evaluación con PostgreSQL', () => {
   const originalUrl = process.env.MINKA_EVALUATION_URL;
   const originalToken = process.env.MINKA_EVALUATION_TOKEN;
   const originalIntegration = {
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+    GMAIL_ACCESS_TOKEN: process.env.GMAIL_ACCESS_TOKEN,
+    GMAIL_SENDER_EMAIL: process.env.GMAIL_SENDER_EMAIL,
     MINKA_EVALUATION_CALLBACK_TOKEN:
       process.env.MINKA_EVALUATION_CALLBACK_TOKEN,
     MINKA_NOTIFICATIONS_URL: process.env.MINKA_NOTIFICATIONS_URL,
@@ -128,7 +132,10 @@ describe('Propuestas y entrega a evaluación con PostgreSQL', () => {
         CatalogModule,
         EvaluationResultsModule,
       ],
-    }).compile();
+    })
+      .overrideGuard(GoogleSessionGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
     dispatcher = module.get(EvaluationDispatchService);
     gateway = module.get(EvaluationGateway);
     sesiones.admin = { ...sesiones.other, roles: ['administrador'] };
@@ -193,6 +200,9 @@ describe('Propuestas y entrega a evaluación con PostgreSQL', () => {
   });
 
   beforeEach(async () => {
+    delete process.env.GEMINI_API_KEY;
+    delete process.env.GMAIL_ACCESS_TOKEN;
+    delete process.env.GMAIL_SENDER_EMAIL;
     failNotifications = false;
     notificationKeys.length = 0;
     process.env.MINKA_EVALUATION_CALLBACK_TOKEN = 'callback-de-prueba';
@@ -644,6 +654,49 @@ describe('Propuestas y entrega a evaluación con PostgreSQL', () => {
       .set('Idempotency-Key', key)
       .send(body);
 
+  it.each([
+    { result: 'favorable', expected: 'aprobada', published: 1 },
+    { result: 'requiere_revision', expected: 'en_revision', published: 0 },
+    { result: 'malformed', expected: 'en_revision', published: 0 },
+    { result: 'unavailable', expected: 'en_revision', published: 0 },
+  ])('procesa Gemini desde la cola con resultado $result', async ({ result, expected, published }) => {
+    const { body } = await crear().expect(201);
+    process.env.GEMINI_API_KEY = 'gemini-local-fixture';
+    const indicators = outcome(body.id_propuesta).indicadores_json;
+    indicators.ambiguedad = result === 'requiere_revision';
+    const gemini = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      if (result === 'unavailable') return new Response(null, { status: 503 });
+      const text = result === 'malformed' ? 'no-json' : JSON.stringify({
+        resultado: result,
+        indicadores_json: indicators,
+        razones: result === 'requiere_revision' ? 'La propuesta es ambigua.' : null,
+      });
+      return Response.json({ candidates: [{ content: { parts: [{ text }] } }] });
+    });
+    try {
+      const dispatches = await Promise.all([dispatcher.dispatchOne(), dispatcher.dispatchOne()]);
+      expect(dispatches.filter(Boolean)).toHaveLength(1);
+      expect(gemini).toHaveBeenCalledTimes(1);
+      expect(await prisma.propuesta.findUniqueOrThrow({
+        where: { id_propuesta: body.id_propuesta },
+        select: { estado: true },
+      })).toEqual({ estado: expected });
+      expect(await prisma.actividad.count({
+        where: { id_propuesta: body.id_propuesta },
+      })).toBe(published);
+      const submission = await prisma.solicitudEvaluacion.findFirstOrThrow({
+        where: { id_propuesta: body.id_propuesta },
+      });
+      expect(submission.estado).toBe(result === 'unavailable' ? 'requiere_revision' : 'entregada');
+      expect(await prisma.evaluacionIa.count({
+        where: { id_propuesta: body.id_propuesta },
+      })).toBe(result === 'unavailable' ? 0 : 1);
+      expect(await dispatcher.dispatchOne()).toBe(false);
+    } finally {
+      gemini.mockRestore();
+    }
+  });
+
   it('aplica una evaluación favorable, publica, audita y genera un único aviso', async () => {
     const { body } = await crear().expect(201);
     const key = randomUUID();
@@ -734,6 +787,84 @@ describe('Propuestas y entrega a evaluación con PostgreSQL', () => {
       }),
     ).toBe(0);
   });
+
+  it.each(['aprobar', 'rechazar'] as const)(
+    'mantiene auditoría y aviso interno al %s aunque Gmail falle',
+    async (decision) => {
+      const { body } = await crear().expect(201);
+      const id = body.id_propuesta;
+      const data = outcome(id);
+      data.resultado = 'requiere_revision';
+      await callback(data).expect(201);
+      const motivo = 'Decisión de prueba con justificación.';
+      await revisar(id, { decision, version_propuesta: 1, motivo }).expect(201);
+      const history = await request(app.getHttpServer())
+        .get('/api/v1/admin/audit')
+        .query({ entity: 'propuesta', id })
+        .set('x-test-user', 'admin')
+        .expect(200);
+      expect(history.body).toEqual(expect.arrayContaining([expect.objectContaining({
+        accion: 'revision_administrativa',
+        motivo,
+      })]));
+      const mine = () => request(app.getHttpServer()).get('/api/v1/notifications')
+        .set('x-test-user', 'owner').expect(200);
+      const type = decision === 'aprobar' ? 'propuesta_aprobada' : 'propuesta_rechazada';
+      const notice = (await mine()).body.find((row: { tipo_evento: string }) => row.tipo_evento === type);
+      expect(notice).toMatchObject({ leida: false });
+      const queued = await prisma.envioCorreo.findUniqueOrThrow({ where: { id_evento: notice.id } });
+      expect(queued).toMatchObject({ estado: 'pendiente', destinatario: sesiones.owner.correo });
+
+      // Procesa solo el correo de esta decisión, no el aviso anterior de revisión.
+      const earlier = await prisma.eventoNotificacion.findMany({
+        where: { id_destinatario: usuarios[0], id_evento: { not: notice.id } },
+        select: { id_evento: true },
+      });
+      await prisma.envioCorreo.updateMany({
+        where: { id_evento: { in: earlier.map(({ id_evento }) => id_evento) } },
+        data: { proximo_intento: new Date(Date.now() + 60000) },
+      });
+      process.env.GMAIL_ACCESS_TOKEN = 'gmail-local-fixture';
+      process.env.GMAIL_SENDER_EMAIL = 'sender@example.invalid';
+      const gmail = vi.spyOn(globalThis, 'fetch')
+        .mockImplementationOnce(async () => new Response(null, { status: 503 }))
+        .mockImplementationOnce(async () => Response.json({ id: 'gmail-test-message' }));
+      try {
+        expect(await notifications.dispatchEmailOne()).toBe(true);
+        const failed = await prisma.envioCorreo.findUniqueOrThrow({
+          where: { id_evento: notice.id },
+        });
+        expect(failed).toMatchObject({ estado: 'pendiente', intentos: 1 });
+        expect(failed.proximo_intento.getTime()).toBeGreaterThan(queued.proximo_intento.getTime());
+        expect((await mine()).body).toEqual(expect.arrayContaining([notice]));
+        const read = (user: string) => request(app.getHttpServer())
+          .patch(`/api/v1/notifications/${notice.id}/read`)
+          .set('x-test-user', user)
+          .send({ leida: true });
+        await read('admin').expect(404);
+        await read('owner').expect(200);
+        const firstRead = await prisma.eventoNotificacion.findUniqueOrThrow({ where: { id_evento: notice.id } });
+        expect(firstRead.leida_en).toBeInstanceOf(Date);
+        await read('owner').expect(200);
+        const again = await prisma.eventoNotificacion.findUniqueOrThrow({ where: { id_evento: notice.id } });
+        expect(again.leida_en).toEqual(firstRead.leida_en);
+        await prisma.envioCorreo.update({
+          where: { id_evento: notice.id },
+          data: { proximo_intento: new Date(0) },
+        });
+        expect(await notifications.dispatchEmailOne()).toBe(true);
+        expect(await prisma.envioCorreo.findUniqueOrThrow({
+          where: { id_evento: notice.id },
+        })).toMatchObject({ estado: 'entregado', intentos: 2 });
+        expect(gmail).toHaveBeenCalledTimes(2);
+        expect(await notifications.dispatchEmailOne()).toBe(false);
+        expect(await prisma.actividad.count({ where: { id_propuesta: id } }))
+          .toBe(decision === 'aprobar' ? 1 : 0);
+      } finally {
+        gmail.mockRestore();
+      }
+    },
+  );
 
   it('el fallo de notificaciones conserva la publicación y reintenta con la misma clave', async () => {
     const { body } = await crear().expect(201);

@@ -3,6 +3,11 @@ import { Routes } from '@angular/router';
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'actividades' },
   {
+    path: 'iniciar-sesion',
+    loadComponent: () =>
+      import('./features/identity/sign-in.component').then((m) => m.SignInComponent),
+  },
+  {
     path: 'perfil/completar',
     loadComponent: () =>
       import('./features/identity/complete-profile.component').then(

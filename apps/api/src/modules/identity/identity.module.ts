@@ -10,6 +10,6 @@ import { IdentityService } from './identity.service.js';
   imports: [PrismaModule],
   controllers: [IdentityController, ProfileController],
   providers: [GoogleSessionGuard, GoogleTokenVerifier, IdentityService],
-  exports: [IdentityService],
+  exports: [IdentityService, GoogleTokenVerifier],
 })
 export class IdentityModule {}

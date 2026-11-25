@@ -9,12 +9,14 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { GoogleSessionGuard } from '../identity/google-session.guard.js';
 import type { SessionRequest } from '../access-control/session-request.js';
 import { ProposerGuard } from '../access-control/access-control.guards.js';
 import { CreateProposalDto } from './create-proposal.dto.js';
 import { ProposalsService } from './proposals.service.js';
 
 @Controller('proposals')
+@UseGuards(GoogleSessionGuard)
 export class ProposalsController {
   constructor(private readonly proposals: ProposalsService) {}
 

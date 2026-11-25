@@ -9,12 +9,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AdminGuard } from '../access-control/access-control.guards.js';
+import { GoogleSessionGuard } from '../identity/google-session.guard.js';
 import type { SessionRequest } from '../access-control/session-request.js';
 import { AdminReviewService } from './admin-review.service.js';
 import { AdminDecisionDto } from './admin-review.dto.js';
 
 @Controller('admin/proposals')
-@UseGuards(AdminGuard)
+@UseGuards(GoogleSessionGuard, AdminGuard)
 export class AdminReviewController {
   constructor(private readonly review: AdminReviewService) {}
   @Get('review')
